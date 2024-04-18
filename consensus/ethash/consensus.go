@@ -39,44 +39,51 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	FrontierBlockReward           = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward          = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
-	ConstantinopleBlockReward     = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
-	maxUncles                     = 2                 // Maximum number of uncles allowed in a single block
-	allowedFutureBlockTimeSeconds = int64(15)         // Max seconds from current time allowed for blocks, before they're considered future blocks
+	initialReward     = big.NewInt(5e+18)                                         // Initial block reward, 5 ETH
+	HalvingPeriod     = big.NewInt(8400000)                                       // Halving cycle, 8400000 blocks
+	TotalSupplyCap, _ = big.NewInt(0).SetString("84000000000000000000000000", 10) // The total amount is capped, 84 million ETH
+
+	FrontierBlockReward           = initialReward // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward          = initialReward // Block reward in wei for successfully mining a block upward from Byzantium
+	ConstantinopleBlockReward     = initialReward // Block reward in wei for successfully mining a block upward from Constantinople
+	maxUncles                     = 2             // Maximum number of uncles allowed in a single block
+	allowedFutureBlockTimeSeconds = int64(15)     // Max seconds from current time allowed for blocks, before they're considered future blocks
+
+	// The default difficulty algorithm
+	calcDifficultyDefault = makeDifficultyCalculator(big1)
 
 	// calcDifficultyEip5133 is the difficulty adjustment algorithm as specified by EIP 5133.
 	// It offsets the bomb a total of 11.4M blocks.
 	// Specification EIP-5133: https://eips.ethereum.org/EIPS/eip-5133
-	calcDifficultyEip5133 = makeDifficultyCalculator(big.NewInt(11_400_000))
+	//calcDifficultyEip5133 = makeDifficultyCalculator(big.NewInt(11_400_000))
 
 	// calcDifficultyEip4345 is the difficulty adjustment algorithm as specified by EIP 4345.
 	// It offsets the bomb a total of 10.7M blocks.
 	// Specification EIP-4345: https://eips.ethereum.org/EIPS/eip-4345
-	calcDifficultyEip4345 = makeDifficultyCalculator(big.NewInt(10_700_000))
+	//calcDifficultyEip4345 = makeDifficultyCalculator(big.NewInt(10_700_000))
 
 	// calcDifficultyEip3554 is the difficulty adjustment algorithm as specified by EIP 3554.
 	// It offsets the bomb a total of 9.7M blocks.
 	// Specification EIP-3554: https://eips.ethereum.org/EIPS/eip-3554
-	calcDifficultyEip3554 = makeDifficultyCalculator(big.NewInt(9700000))
+	//calcDifficultyEip3554 = makeDifficultyCalculator(big.NewInt(9700000))
 
 	// calcDifficultyEip2384 is the difficulty adjustment algorithm as specified by EIP 2384.
 	// It offsets the bomb 4M blocks from Constantinople, so in total 9M blocks.
 	// Specification EIP-2384: https://eips.ethereum.org/EIPS/eip-2384
-	calcDifficultyEip2384 = makeDifficultyCalculator(big.NewInt(9000000))
+	//calcDifficultyEip2384 = makeDifficultyCalculator(big.NewInt(9000000))
 
 	// calcDifficultyConstantinople is the difficulty adjustment algorithm for Constantinople.
 	// It returns the difficulty that a new block should have when created at time given the
 	// parent block's time and difficulty. The calculation uses the Byzantium rules, but with
 	// bomb offset 5M.
 	// Specification EIP-1234: https://eips.ethereum.org/EIPS/eip-1234
-	calcDifficultyConstantinople = makeDifficultyCalculator(big.NewInt(5000000))
+	//calcDifficultyConstantinople = makeDifficultyCalculator(big.NewInt(5000000))
 
 	// calcDifficultyByzantium is the difficulty adjustment algorithm. It returns
 	// the difficulty that a new block should have when created at time given the
 	// parent block's time and difficulty. The calculation uses the Byzantium rules.
 	// Specification EIP-649: https://eips.ethereum.org/EIPS/eip-649
-	calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
+	//calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -337,29 +344,37 @@ func (ethash *Ethash) CalcDifficulty(chain consensus.ChainHeaderReader, time uin
 // the difficulty that a new block should have when created at time
 // given the parent block's time and difficulty.
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
-	next := new(big.Int).Add(parent.Number, big1)
-	switch {
-	case config.IsGrayGlacier(next):
-		return calcDifficultyEip5133(time, parent)
-	case config.IsArrowGlacier(next):
-		return calcDifficultyEip4345(time, parent)
-	case config.IsLondon(next):
-		return calcDifficultyEip3554(time, parent)
-	case config.IsMuirGlacier(next):
-		return calcDifficultyEip2384(time, parent)
-	case config.IsConstantinople(next):
-		return calcDifficultyConstantinople(time, parent)
-	case config.IsByzantium(next):
-		return calcDifficultyByzantium(time, parent)
-	case config.IsHomestead(next):
-		return calcDifficultyHomestead(time, parent)
-	default:
-		return calcDifficultyFrontier(time, parent)
-	}
+	// The use of the Kark DiFikti Homsïd algorithm is mandatory
+	//return calcDifficultyHomestead(time, parent)
+	return calcDifficultyDefault(time, parent)
+	/*
+		next := new(big.Int).Add(parent.Number, big1)
+		switch {
+		case config.IsGrayGlacier(next):
+			return calcDifficultyEip5133(time, parent)
+		case config.IsArrowGlacier(next):
+			return calcDifficultyEip4345(time, parent)
+		case config.IsLondon(next):
+			return calcDifficultyEip3554(time, parent)
+		case config.IsMuirGlacier(next):
+			return calcDifficultyEip2384(time, parent)
+		case config.IsConstantinople(next):
+			return calcDifficultyConstantinople(time, parent)
+		case config.IsByzantium(next):
+			return calcDifficultyByzantium(time, parent)
+
+		case config.IsHomestead(next):
+			return calcDifficultyHomestead(time, parent)
+
+		default:
+			return calcDifficultyFrontier(time, parent)
+		}
+	*/
 }
 
 // Some weird constants to avoid constant memory allocs for them.
 var (
+	// Depth Charge Adjustment Cycle
 	expDiffPeriod = big.NewInt(100000)
 	big1          = big.NewInt(1)
 	big2          = big.NewInt(2)
@@ -651,25 +666,82 @@ var (
 // included uncles. The coinbase of each uncle block is also rewarded.
 func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
 	// Select the correct block reward based on chain progression
-	blockReward := FrontierBlockReward
-	if config.IsByzantium(header.Number) {
-		blockReward = ByzantiumBlockReward
-	}
-	if config.IsConstantinople(header.Number) {
-		blockReward = ConstantinopleBlockReward
-	}
-	// Accumulate the rewards for the miner and any included uncles
-	reward := new(big.Int).Set(blockReward)
-	r := new(big.Int)
-	for _, uncle := range uncles {
-		r.Add(uncle.Number, big8)
-		r.Sub(r, header.Number)
-		r.Mul(r, blockReward)
-		r.Div(r, big8)
-		state.AddBalance(uncle.Coinbase, r)
+	//blockReward := FrontierBlockReward
 
-		r.Div(blockReward, big32)
-		reward.Add(reward, r)
+	// Obtain the current block number
+	currentBlockNumber := header.Number
+
+	// The calculation is currently the first halving cycle
+	halvingEpoch := big.NewInt(0)
+	h := big.NewInt(0)
+	// The 100th block should not be halved, add the critical value first, and the result is -1
+	h = h.Add(currentBlockNumber, HalvingPeriod)
+	h = h.Sub(h, big.NewInt(1))
+	halvingEpoch.Div(h, HalvingPeriod)
+	halvingEpoch.Sub(halvingEpoch, big.NewInt(1))
+
+	// Calculate the rewards that have been issued based on the block height
+	totalSupply := big.NewInt(0)
+
+	blockReward, _ := big.NewInt(0).SetString(FrontierBlockReward.String(), 10)
+
+	for i := big.NewInt(0); i.Cmp(halvingEpoch) < 0; i.Add(i, big.NewInt(1)) {
+		//Rewards for this period
+		halvingReward := big.NewInt(0).Mul(HalvingPeriod, blockReward)
+		//Included in the total
+		totalSupply.Add(totalSupply, halvingReward)
+		blockReward.Div(blockReward, big.NewInt(2))
 	}
-	state.AddBalance(header.Coinbase, reward)
+
+	// The first threshold is special
+	if currentBlockNumber.Cmp(HalvingPeriod) == 0 {
+		// Rewards for this period
+		halvingReward := big.NewInt(0).Mul(HalvingPeriod, blockReward)
+		// Included in the total
+		totalSupply.Add(totalSupply, halvingReward)
+	}
+
+	// Remainder to get the latest block height
+	modHeight := big.NewInt(0).Mod(currentBlockNumber, HalvingPeriod)
+	// Rewards for this period
+	totalSupply.Add(totalSupply, big.NewInt(0).Mul(modHeight, blockReward))
+
+	// Check whether the total amount limit is reached, if the total amount limit is exceeded, no rewards will be issued
+	/*
+		if state.TotalSupply.Add(state.TotalSupply, blockReward).Cmp(TotalSupplyCap) > 0 {
+			blockReward.Set(big.NewInt(0))
+		}
+	*/
+	if totalSupply.Cmp(TotalSupplyCap) > 0 {
+		blockReward.Set(big.NewInt(0))
+	}
+	// Reward is issued
+	state.AddBalance(header.Coinbase, blockReward)
+
+	// Uncle blocks and other rewards are not processed
+	/*
+		if config.IsByzantium(header.Number) {
+			blockReward = ByzantiumBlockReward
+		}
+		if config.IsConstantinople(header.Number) {
+			blockReward = ConstantinopleBlockReward
+		}
+
+		// Accumulate the rewards for the miner and any included uncles
+		reward := new(big.Int).Set(blockReward)
+
+		r := new(big.Int)
+		for _, uncle := range uncles {
+			r.Add(uncle.Number, big8)
+			r.Sub(r, header.Number)
+			r.Mul(r, blockReward)
+			r.Div(r, big8)
+			state.AddBalance(uncle.Coinbase, r)
+
+			r.Div(blockReward, big32)
+			reward.Add(reward, r)
+		}
+
+		state.AddBalance(header.Coinbase, reward)
+	*/
 }
